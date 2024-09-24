@@ -3,7 +3,6 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Añadido para responsividad -->
     <title>Memorama</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
@@ -171,29 +170,6 @@
         .volumen:hover .volumen-slider {
             display: block; /* Mostrar la barra de volumen al pasar el mouse */
         }
-
-        @media (max-width: 600px) { /* Ajustes para pantallas pequeñas */
-            :root {
-                --w: calc(80vw / 4); /* Cambia el número de tarjetas que caben en una fila */
-                --h: calc(80vw / 4); /* Ajustar el alto */
-            }
-
-            #temporizador {
-                font-size: 100%; /* Ajustar el tamaño de la fuente */
-            }
-
-            #mensaje {
-                font-size: 150%; /* Ajustar el tamaño de la fuente del mensaje */
-            }
-
-            .nuevo-juego {
-                font-size: 100%; /* Ajustar el tamaño del botón */
-            }
-
-            #puntos {
-                font-size: 150%; /* Ajustar el tamaño de los puntos */
-            }
-        }
     </style>
 </head>
 
@@ -235,7 +211,7 @@
         <i class="fas fa-volume-up" style="font-size: 40px;"></i>
         <input type="range" class="volumen-slider" min="0" max="1" step="0.01" value="0.5" onchange="ajustarVolumen(this.value)" />
     </div>
-
+    
     <script>
         let puntos = 0;
         let errores = 0;
@@ -291,97 +267,105 @@
             cargarIconos();
             selecciones = [];
             let tablero = document.getElementById("tablero");
-            tablero.innerHTML = "";
-            iconos = [...iconos, ...iconos];
-            iconos.sort(() => Math.random() - 0.5); // Mezclar iconos.
+            let tarjetas = [];
+            for (let i = 0; i < 24; i++) {
+                tarjetas.push(`
+                <div class="area-tarjeta" id="area-tarjeta${i}" onclick="seleccionarTarjeta(${i})">
+                    <div class="tarjeta" id="tarjeta${i}">
+                        <div class="cara trasera" id="trasera${i}">
+                            ${iconos[Math.floor(i / 2)]}
+                        </div>
+                        <div class="cara superior">
+                            <i class="far fa-question-circle"></i>
+                        </div>
+                    </div>
+                </div>`);
+            }
+            tarjetas.sort(() => Math.random() - 0.5);
+            tablero.innerHTML = tarjetas.join(" ");
 
-            iconos.forEach((icono, index) => {
-                let areaTarjeta = document.createElement("div");
-                areaTarjeta.className = "area-tarjeta";
-                areaTarjeta.setAttribute("data-id", index);
-                areaTarjeta.onclick = seleccionarTarjeta;
+            mostrarCartasTemporalmente();
 
-                let tarjeta = document.createElement("div");
-                tarjeta.className = "tarjeta";
-                tarjeta.innerHTML = `<div class="cara superior">${icono}</div>
-                                    <div class="cara trasera"></div>`;
-                areaTarjeta.appendChild(tarjeta);
-                tablero.appendChild(areaTarjeta);
-            });
-
-            juegoActivo = true; // Marca el juego como activo
-            iniciarTemporizador();
-            iniciarMusicaFondo(); // Iniciar la música de fondo
+            // Iniciar la música de fondo cuando comience el juego
+            iniciarMusicaFondo();
         }
 
-        function seleccionarTarjeta() {
-            if (!juegoActivo) return; // Si el juego no está activo, salir de la función.
+        function mostrarCartasTemporalmente() {
+            for (let i = 0; i < 24; i++) {
+                document.getElementById(`tarjeta${i}`).style.transform = "rotateY(180deg)";
+            }
 
-            let tarjeta = this.querySelector(".tarjeta");
-            let idTarjeta = this.getAttribute("data-id");
-
-            if (selecciones.length < 2 && !selecciones.includes(idTarjeta) && !parejasVolteadas.includes(idTarjeta)) {
-                tarjeta.style.transform = "rotateY(180deg)";
-                selecciones.push(idTarjeta);
-
-                if (selecciones.length === 2) {
-                    movimientos++;
-                    setTimeout(comprobarPareja, 1000);
+            setTimeout(() => {
+                for (let i = 0; i < 24; i++) {
+                    document.getElementById(`tarjeta${i}`).style.transform = "rotateY(0deg)";
                 }
+                iniciarTemporizador();
+                juegoActivo = true;
+            }, 3000); // Mostrar las cartas 3 segundos.
+        }
+
+        function seleccionarTarjeta(i) {
+            if (!juegoActivo || selecciones.length === 2 || selecciones.includes(i) || parejasVolteadas.includes(i)) return;
+
+            document.getElementById(`tarjeta${i}`).style.transform = "rotateY(180deg)";
+            selecciones.push(i);
+
+            if (selecciones.length === 2) {
+                movimientos++;
+                setTimeout(() => revisarSeleccion(), 1000);
             }
         }
 
-        function comprobarPareja() {
-            let [primeraSeleccion, segundaSeleccion] = selecciones;
-            let tarjetas = document.querySelectorAll(".tarjeta");
-
-            if (tarjetas[primeraSeleccion].innerHTML === tarjetas[segundaSeleccion].innerHTML) {
-                parejasVolteadas.push(primeraSeleccion, segundaSeleccion);
-                puntos += 10;
+        function revisarSeleccion() {
+            let [i1, i2] = selecciones;
+            if (document.getElementById(`trasera${i1}`).innerHTML === document.getElementById(`trasera${i2}`).innerHTML) {
+                parejasVolteadas.push(i1, i2);
+                puntos++;
                 document.getElementById("puntos").innerHTML = "Puntos: " + puntos;
+
+                if (parejasVolteadas.length === 24) {
+                    juegoActivo = false;
+                    clearInterval(temporizador);
+                    mostrarMensajeFin(true);
+                }
             } else {
-                tarjetas[primeraSeleccion].style.transform = "rotateY(0deg)";
-                tarjetas[segundaSeleccion].style.transform = "rotateY(0deg)";
+                document.getElementById(`tarjeta${i1}`).style.transform = "rotateY(0deg)";
+                document.getElementById(`tarjeta${i2}`).style.transform = "rotateY(0deg)";
                 errores++;
             }
-
             selecciones = [];
-
-            if (parejasVolteadas.length === iconos.length) {
-                terminarJuego();
-            }
         }
 
         function iniciarTemporizador() {
             temporizador = setInterval(() => {
                 tiempoRestante--;
-                document.getElementById("temporizador").innerText = new Date(tiempoRestante * 1000).toISOString().substr(14, 5);
+                let minutos = Math.floor(tiempoRestante / 60);
+                let segundos = tiempoRestante % 60;
+                document.getElementById("temporizador").innerText = `${minutos < 10 ? "0" : ""}${minutos}:${segundos < 10 ? "0" : ""}${segundos}`;
 
-                if (tiempoRestante <= 0) {
+                if (tiempoRestante === 0) {
                     clearInterval(temporizador);
-                    terminarJuego();
+                    juegoActivo = false;
+                    mostrarMensajeFin(false);
                 }
             }, 1000);
         }
 
-        function terminarJuego() {
-            juegoActivo = false; // Marca el juego como no activo
-            clearInterval(temporizador);
-
-            document.getElementById("resultado").innerText = "Juego Terminado";
-            document.getElementById("aciertos").innerText = puntos / 10;
+        function mostrarMensajeFin(ganaste) {
+            document.getElementById("mensaje").style.display = "block";
+            document.getElementById("resultado").innerText = ganaste ? "¡Ganaste!" : "¡Tiempo agotado!";
+            document.getElementById("aciertos").innerText = puntos;
             document.getElementById("errores").innerText = errores;
-            document.getElementById("porcentaje").innerText = ((puntos / (movimientos * 10)) * 100).toFixed(2);
+            document.getElementById("porcentaje").innerText = ((puntos / movimientos) * 100).toFixed(2);
             document.getElementById("tiempo").innerText = 120 - tiempoRestante;
-            document.getElementById("mensaje").style.display = "block"; // Muestra el mensaje
         }
 
         function mostrarSlider() {
-            document.querySelector('.volumen-slider').style.display = 'block'; // Mostrar slider
+            document.querySelector('.volumen-slider').style.display = 'block';
         }
 
         function ocultarSlider() {
-            document.querySelector('.volumen-slider').style.display = 'none'; // Ocultar slider
+            document.querySelector('.volumen-slider').style.display = 'none';
         }
     </script>
 </body>
